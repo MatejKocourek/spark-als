@@ -211,7 +211,15 @@ PROGMEM const char usbHidReportDescriptor[] = {
     HID_INPUT(Data_Var_Abs),
 
     HID_END_COLLECTION};
+
+// Configuration descriptor, the same as V-USB's but without the remote wakeup attribute, which this device does not support.
+PROGMEM const char usbDescriptorConfiguration[] = {
+    9, USBDESCR_CONFIG, 34, 0, 1, 1, 0, 1 << 7, USB_CFG_MAX_BUS_POWER / 2,
+    9, USBDESCR_INTERFACE, 0, 0, 1, USB_CFG_INTERFACE_CLASS, USB_CFG_INTERFACE_SUBCLASS, USB_CFG_INTERFACE_PROTOCOL, 0,
+    9, USBDESCR_HID, 0x01, 0x01, 0x00, 0x01, 0x22, USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH & 0xFF, USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH >> 8,
+    7, USBDESCR_ENDPOINT, 0x81, 0x03, 8, 0, USB_CFG_INTR_POLL_INTERVAL};
 #pragma GCC diagnostic pop
+static_assert(sizeof(usbDescriptorConfiguration) == USB_CFG_DESCR_PROPS_CONFIGURATION, "Update USB_CFG_DESCR_PROPS_CONFIGURATION in usbconfig.h");
 
 static_assert(sizeof(usbHidReportDescriptor) == USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH, "Update USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH in usbconfig.h");
 

@@ -337,7 +337,7 @@ section at the end of this file).
  */
 
 #define USB_CFG_DESCR_PROPS_DEVICE                  0
-#define USB_CFG_DESCR_PROPS_CONFIGURATION           0
+#define USB_CFG_DESCR_PROPS_CONFIGURATION           34 /* own descriptor in main.cpp */
 #define USB_CFG_DESCR_PROPS_STRINGS                 0
 #define USB_CFG_DESCR_PROPS_STRING_0                0
 #define USB_CFG_DESCR_PROPS_STRING_VENDOR           0
