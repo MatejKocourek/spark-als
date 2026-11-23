@@ -349,6 +349,8 @@ static void featureReportReload()
       }
     }
     break;
+  case HID_USAGE_SENSOR_PROPERTY_POWER_STATE_D2_STANDBY_WITH_WAKE_ENUM:
+  case HID_USAGE_SENSOR_PROPERTY_POWER_STATE_D3_SLEEP_WITH_WAKE_ENUM:
   case HID_USAGE_SENSOR_PROPERTY_POWER_STATE_D4_POWER_OFF_ENUM: // The computer tells us the sensor is not needed at all and should conserve power. When no application uses our sensor, this will be its state.
   {
     if (running)
@@ -369,6 +371,21 @@ static void featureReportReload()
   // LED_ON();
   //_delay_ms(50);
   // LED_OFF();
+}
+
+// Checks if the computer wants data reports. The *_WAKE variants only add waking up the computer, which this device does not support.
+static bool reportingEnabled()
+{
+  switch (featureReportBuf.reportingState)
+  {
+  case HID_USAGE_SENSOR_PROPERTY_REPORTING_STATE_ALL_EVENTS_SEL_ENUM:
+  case HID_USAGE_SENSOR_PROPERTY_REPORTING_STATE_THRESHOLD_EVENTS_SEL_ENUM:
+  case HID_USAGE_SENSOR_PROPERTY_REPORTING_STATE_ALL_EVENTS_SEL_WAKE_ENUM:
+  case HID_USAGE_SENSOR_PROPERTY_REPORTING_STATE_THRESHOLD_EVENTS_WAKE_SEL_ENUM:
+    return true;
+  default:
+    return false;
+  }
 }
 
 // Checks if our new value has broken out of the threshold the computer set, in lux.
@@ -427,7 +444,7 @@ void loop()
   {
     checkUpdateState();
   }
-  else if (featureReportBuf.reportingState != HID_USAGE_SENSOR_PROPERTY_REPORTING_STATE_NO_EVENTS_SEL_ENUM && (millis() >= nextReportTime)) // When it's a time for a report and the computer wants us reporting.
+  else if (running && reportingEnabled() && (millis() >= nextReportTime)) // When it's a time for a report and the computer wants us reporting.
   {
     float lux = BH1750::readLux();
     if (lux < 0)
