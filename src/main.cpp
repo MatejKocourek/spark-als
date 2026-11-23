@@ -269,6 +269,8 @@ static void queueReport(uint8_t event)
 
 static void sendPendingReport()
 {
+  if (inputReportBuf.sensorState == HID_USAGE_SENSOR_STATE_ERROR_SEL_ENUM && pendingEvent != HID_USAGE_SENSOR_EVENT_STATE_CHANGED_SEL_ENUM) // The sensor failed, a sample waiting from before is not sent.
+    pendingEvent = 0;
   if (pendingEvent && usbInterruptIsReady())
   {
     inputReportBuf.eventType = pendingEvent;
@@ -411,6 +413,9 @@ void loop()
   usbPoll(); // Needs to be called often to keep connection with the computer.
   sendPendingReport();
 
+  if (inputReportBuf.sensorState == HID_USAGE_SENSOR_STATE_ERROR_SEL_ENUM) // Sensor failed while answering a GET_REPORT, which cannot block in error().
+    error();
+
   if(featureReportChanged)
   {
     featureReportReload();
@@ -425,6 +430,8 @@ void loop()
   else if (featureReportBuf.reportingState != HID_USAGE_SENSOR_PROPERTY_REPORTING_STATE_NO_EVENTS_SEL_ENUM && (millis() >= nextReportTime)) // When it's a time for a report and the computer wants us reporting.
   {
     float lux = BH1750::readLux();
+    if (lux < 0)
+      error();
     // uint32_t convertedLux = convertLux(lux);
     // if (convertedLux != inputReportBuf.lightValue) // If the value is the same as last time, it should not be sent -> OR DOES IT? NEEDS INVESTIGATING, DOCUMENTATION NOT CLEAR
     if (relativeSensitivityReached(lux) && absoluteSensitivityReached(lux)) // Checks if the value is in the threshold. When both thresholds are set, both needs to be met.
@@ -471,7 +478,14 @@ extern "C"
         case 0x01: /* Get Input report */ // This is the computer explicitly asking for current value of the sensor. Does not usually happen after initilization, but it is allowed.
         {
           inputReportBuf.eventType = HID_USAGE_SENSOR_EVENT_POLL_RESPONSE_SEL_ENUM;
-          inputReportBuf.lightValue = convertLux(BH1750::readLux());
+          if (running) // A powered down sensor has no new data.
+          {
+            float lux = BH1750::readLux();
+            if (lux < 0)
+              inputReportBuf.sensorState = HID_USAGE_SENSOR_STATE_ERROR_SEL_ENUM; // loop() calls error()
+            else
+              inputReportBuf.lightValue = convertLux(lux);
+          }
           usbMsgPtr = (uchar *)&inputReportBuf;
           return sizeof(inputReportBuf);
         }

@@ -69,17 +69,21 @@ namespace BH1750
         constexpr byte _addressWrite = (_address << 1);
         // constexpr uint16_t maxRawValue = -1;
 
-        // Reads value directly from sensor. This is NOT in lux, and needs to be converted.
-        uint16_t readRawValue()
+        // Reads value directly from sensor. This is NOT in lux, and needs to be converted. Returns -1 if the sensor did not respond.
+        int32_t readRawValue()
         {
             byte buff[2];
 
-            i2c_start(_addressRead);
+            if (!i2c_start(_addressRead))
+            {
+                i2c_stop();
+                return -1;
+            }
             buff[0] = i2c_read(false);
             buff[1] = i2c_read(true);
             i2c_stop();
 
-            return ((buff[0] << 8) | buff[1]);
+            return (uint16_t(buff[0]) << 8) | buff[1];
         }
 
         // Sends byte directly to the sensor. Internal funciton.
@@ -157,10 +161,11 @@ namespace BH1750
         return powerDown();
     }
 
-    // Main function of the library. Call this to retrieve lux values from the sensor.
+    // Main function of the library. Call this to retrieve lux values from the sensor. Returns a negative value if the sensor did not respond.
     lux_t readLux()
     {
-        return calcLux(readRawValue());
+        int32_t raw = readRawValue();
+        return raw < 0 ? -1 : calcLux(raw);
     }
 
 }
