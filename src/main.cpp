@@ -487,7 +487,7 @@ extern "C"
         case 0x01: /* Get Input report */ // This is the computer explicitly asking for current value of the sensor. Does not usually happen after initilization, but it is allowed.
         {
           inputReportBuf.eventType = HID_USAGE_SENSOR_EVENT_POLL_RESPONSE_SEL_ENUM;
-          if (running) // A powered down sensor has no new data.
+          if (inputReportBuf.sensorState == HID_USAGE_SENSOR_STATE_READY_SEL_ENUM) // Otherwise the sensor has no finished measurement, and the last valid value is returned.
           {
             float lux = BH1750::readLux();
             if (lux < 0)
