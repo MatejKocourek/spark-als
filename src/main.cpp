@@ -322,6 +322,7 @@ static void featureReportReload()
         running = true;
         inputReportBuf.sensorState = HID_USAGE_SENSOR_STATE_INITIALIZING_SEL_ENUM;
         featureReportBuf.sensorState = HID_USAGE_SENSOR_STATE_INITIALIZING_SEL_ENUM;
+        inputReportBuf.eventType = HID_USAGE_SENSOR_EVENT_STATE_CHANGED_SEL_ENUM;
         usbSetInterrupt((uchar *)&inputReportBuf, sizeof(inputReportBuf));
       }
     }
@@ -335,6 +336,7 @@ static void featureReportReload()
       running = false;
       inputReportBuf.sensorState = HID_USAGE_SENSOR_STATE_NO_DATA_SEL_ENUM;
       featureReportBuf.sensorState = HID_USAGE_SENSOR_STATE_NO_DATA_SEL_ENUM;
+      inputReportBuf.eventType = HID_USAGE_SENSOR_EVENT_STATE_CHANGED_SEL_ENUM;
       usbSetInterrupt((uchar *)&inputReportBuf, sizeof(inputReportBuf));
     }
   }
