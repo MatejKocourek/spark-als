@@ -15,6 +15,7 @@
  */
 
 #include <stddef.h>
+#include <avr/sleep.h>
 #include <util/delay.h>
 
 extern "C"
@@ -298,6 +299,42 @@ static void sendPendingReport()
   }
 }
 
+// The host suspends the bus by stopping the keep-alive pulses, sent every 1 ms while it is active. After 3 ms the device has to save power.
+// Power-down cannot be used, waking from it takes over 64 ms with the PLL clock (SUT fuses), but USB allows only 10 ms after resume.
+// Idle with the clock divided by 16 instead. V-USB's interrupt still runs on the wake-up edge, but too slowly to receive anything.
+static void suspend()
+{
+  cli();
+  CLKPR = 1 << CLKPCE;
+  CLKPR = 4;
+  sleep_enable(); // Idle is the default sleep mode.
+  while (!usbSofCount && (USBIN & USBMASK) == (1 << USBMINUS)) // No keep-alive and the bus idle (J), not a reset or resume.
+  {
+    sei(); // The instruction after sei() runs before any interrupt, so a wake-up edge cannot be missed.
+    sleep_cpu();
+    cli();
+  }
+  CLKPR = 1 << CLKPCE;
+  CLKPR = 0;
+  sei();
+}
+
+uint8_t lastBusActivity = 0; // Low byte of millis(), enough to measure the 3 ms.
+
+static void poll()
+{
+  usbPoll();
+  sendPendingReport();
+  uint8_t now = millis();
+  if (usbSofCount) // A keep-alive was received since the last check. During a reset or resume suspend() returns immediately.
+  {
+    usbSofCount = 0;
+    lastBusActivity = now;
+  }
+  else if (uint8_t(now - lastBusActivity) > 3)
+    suspend();
+}
+
 // If the I2C fails to cummunicate, the code falls into this. If that happens, check the connection of the sensor and if the I2C pin macros are configured correctly in bh1750.h
 static void error()
 {
@@ -307,8 +344,7 @@ static void error()
   stateChangePending = true;
   while (true)
   {
-    usbPoll();
-    sendPendingReport();
+    poll();
   }
 }
 
@@ -345,12 +381,12 @@ bool running = false;              // If the sensor is currently sampling data.
 bool featureReportChanged = false; // If the computer changed the feature report.
 float previousLux = 0;             // For the sensitivty functionality.
 
+
 // Checks if the given time has passed, also when millis() overflows (every ~49 days).
 static bool timeReached(unsigned long now, unsigned long time)
 {
   return long(now - time) >= 0;
 }
-
 
 // Computer changed the feature report, restart everything.
 static void featureReportReload(unsigned long now)
@@ -438,8 +474,7 @@ static bool relativeSensitivityReached(const float &newVal)
 
 void loop()
 {
-  usbPoll(); // Needs to be called often to keep connection with the computer.
-  sendPendingReport();
+  poll(); // Needs to be called often to keep connection with the computer.
   unsigned long now = millis();
 
   if (inputReportBuf.sensorState == HID_USAGE_SENSOR_STATE_ERROR_SEL_ENUM) // Sensor failed while answering a GET_REPORT, which cannot block in error().

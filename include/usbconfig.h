@@ -171,7 +171,7 @@ section at the end of this file).
 /* This macro (if defined) is executed when a USB SET_ADDRESS request was
  * received.
  */
-#define USB_COUNT_SOF                   0
+#define USB_COUNT_SOF                   1 /* to detect USB suspend */
 /* define this macro to 1 if you need the global variable "usbSofCount" which
  * counts SOF packets. This feature requires that the hardware interrupt is
  * connected to D- instead of D+.
@@ -374,7 +374,7 @@ section at the end of this file).
 /* #define USB_INTR_VECTOR         INT0_vect */
 
 #define USB_INTR_CFG            PCMSK // Pin interrupt enable register
-#define USB_INTR_CFG_SET        (1 << USB_CFG_DPLUS_BIT) // Mask for pin in pin interrupt enable register PCMSK to be set on usbInit
+#define USB_INTR_CFG_SET        (1 << USB_CFG_DMINUS_BIT) // Mask for pin in pin interrupt enable register PCMSK to be set on usbInit. D- because USB_COUNT_SOF needs it.
 #define USB_INTR_CFG_CLR        0 // Mask for pin in pin interrupt enable register PCMSK to be cleared on usbInit. 0 = no clear
 #define USB_INTR_ENABLE         GIMSK // Global interrupt enable register
 #define USB_INTR_ENABLE_BIT     PCIE  // Bit position in global interrupt enable register
