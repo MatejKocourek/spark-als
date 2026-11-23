@@ -130,6 +130,13 @@ namespace BH1750
         }
     }
 
+    // Provides the longest time one measurement takes in this configuration, in ms (in compile time). The datasheet gives
+    // 180 ms for the high resolution modes and 24 ms for the low resolution mode at the default MTREG, it scales with MTREG.
+    constexpr unsigned long measurementTime()
+    {
+        return ((_mode & 0b11) == 0b11 ? 24ul : 180ul) * _mtreg / BH1750_MTREG_DEFAULT + 1; // +1 rounds up
+    }
+
     // Provides the resolution in lux achieved using this configuration (in compile time).
     constexpr lux_t resolution()
     {

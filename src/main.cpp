@@ -34,8 +34,8 @@ extern "C"
 static constexpr uint16_t exponentPercantage = 100u;
 static constexpr uint32_t exponentLux = 10000u;
 
-//We expect the sensor to definitely be done measuring after this time. With the highest precision, it is between 400-500, depends on sensor.
-static constexpr unsigned long sensorMeasurementTime = 500u;
+//We expect the sensor to definitely be done measuring after this time, the datasheet maximum for its configuration.
+static constexpr unsigned long sensorMeasurementTime = BH1750::measurementTime();
 
 // HID Report Descriptor
 #pragma GCC diagnostic push
