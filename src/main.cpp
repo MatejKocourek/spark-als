@@ -258,24 +258,28 @@ struct
     0,                                       // The main value of the sensor, in lux (scaled, as the rest).
 };
 
-// Event of the input report waiting for the interrupt endpoint to be free, 0 if none. Handing V-USB a new report before the previous one was sent would overwrite it.
-uint8_t pendingEvent = 0;
-
-static void queueReport(uint8_t event)
-{
-  if (pendingEvent != HID_USAGE_SENSOR_EVENT_STATE_CHANGED_SEL_ENUM) // A pending state change must not be lost, newer data is sent along with it.
-    pendingEvent = event;
-}
+// Input reports waiting for the interrupt endpoint to be free. Handing V-USB a new report before the previous one was sent would overwrite it.
+bool stateChangePending = false;
+uint8_t pendingDataEvent = 0; // 0 if no data report is waiting.
 
 static void sendPendingReport()
 {
-  if (inputReportBuf.sensorState == HID_USAGE_SENSOR_STATE_ERROR_SEL_ENUM && pendingEvent != HID_USAGE_SENSOR_EVENT_STATE_CHANGED_SEL_ENUM) // The sensor failed, a sample waiting from before is not sent.
-    pendingEvent = 0;
-  if (pendingEvent && usbInterruptIsReady())
+  if (!usbInterruptIsReady())
+    return;
+  if (inputReportBuf.sensorState == HID_USAGE_SENSOR_STATE_ERROR_SEL_ENUM) // The sensor failed, a sample waiting from before is not sent.
+    pendingDataEvent = 0;
+  uint8_t event = pendingDataEvent;
+  if (stateChangePending) // A data report waiting behind it follows as its own event.
   {
-    inputReportBuf.eventType = pendingEvent;
+    stateChangePending = false;
+    event = HID_USAGE_SENSOR_EVENT_STATE_CHANGED_SEL_ENUM;
+  }
+  else
+    pendingDataEvent = 0;
+  if (event)
+  {
+    inputReportBuf.eventType = event;
     usbSetInterrupt((uchar *)&inputReportBuf, sizeof(inputReportBuf));
-    pendingEvent = 0;
   }
 }
 
@@ -285,7 +289,7 @@ static void error()
   LED_ON();
   inputReportBuf.sensorState = HID_USAGE_SENSOR_STATE_ERROR_SEL_ENUM;
   featureReportBuf.sensorState = HID_USAGE_SENSOR_STATE_ERROR_SEL_ENUM;
-  queueReport(HID_USAGE_SENSOR_EVENT_STATE_CHANGED_SEL_ENUM);
+  stateChangePending = true;
   while (true)
   {
     usbPoll();
@@ -351,7 +355,7 @@ static void featureReportReload(unsigned long now)
         running = true;
         inputReportBuf.sensorState = HID_USAGE_SENSOR_STATE_INITIALIZING_SEL_ENUM;
         featureReportBuf.sensorState = HID_USAGE_SENSOR_STATE_INITIALIZING_SEL_ENUM;
-        queueReport(HID_USAGE_SENSOR_EVENT_STATE_CHANGED_SEL_ENUM);
+        stateChangePending = true;
       }
     }
     break;
@@ -366,7 +370,7 @@ static void featureReportReload(unsigned long now)
       running = false;
       inputReportBuf.sensorState = HID_USAGE_SENSOR_STATE_NO_DATA_SEL_ENUM;
       featureReportBuf.sensorState = HID_USAGE_SENSOR_STATE_NO_DATA_SEL_ENUM;
-      queueReport(HID_USAGE_SENSOR_EVENT_STATE_CHANGED_SEL_ENUM);
+      stateChangePending = true;
     }
   }
   break;
@@ -422,7 +426,7 @@ bool checkUpdateState(unsigned long now)
     {
       inputReportBuf.sensorState = HID_USAGE_SENSOR_STATE_READY_SEL_ENUM;
       featureReportBuf.sensorState = HID_USAGE_SENSOR_STATE_READY_SEL_ENUM;
-      queueReport(HID_USAGE_SENSOR_EVENT_STATE_CHANGED_SEL_ENUM);
+      stateChangePending = true;
     }
     // LED_OFF();
     return true;
@@ -465,9 +469,9 @@ void loop()
       inputReportBuf.sensorState = HID_USAGE_SENSOR_STATE_READY_SEL_ENUM;
       featureReportBuf.sensorState = HID_USAGE_SENSOR_STATE_READY_SEL_ENUM;
       if (featureReportBuf.lightChangeSensitivity == 0 && featureReportBuf.lightChangeSensitivityRel == 0) // Thresholds not set, we should report every change.
-        queueReport(HID_USAGE_SENSOR_EVENT_DATA_UPDATED_SEL_ENUM); // The report is sent because the value changed and no thresholds are set.
+        pendingDataEvent = HID_USAGE_SENSOR_EVENT_DATA_UPDATED_SEL_ENUM; // The report is sent because the value changed and no thresholds are set.
       else
-        queueReport(HID_USAGE_SENSOR_EVENT_CHANGE_SENSITIVITY_SEL_ENUM); // The report is sent because the thresholds are met.
+        pendingDataEvent = HID_USAGE_SENSOR_EVENT_CHANGE_SENSITIVITY_SEL_ENUM; // The report is sent because the thresholds are met.
     }
     nextReportTime = now + featureReportBuf.reportInterval;
   }
@@ -555,8 +559,7 @@ extern "C"
     if (isEnd)
     {
       featureReportChanged = true;
-      if (pendingEvent != HID_USAGE_SENSOR_EVENT_STATE_CHANGED_SEL_ENUM) // A sample still waiting for the endpoint was taken under the old settings, which may not allow reporting. Dropped here, it could be sent before the settings are reloaded.
-        pendingEvent = 0;
+      pendingDataEvent = 0; // A sample still waiting for the endpoint was taken under the old settings, which may not allow reporting. Dropped here, it could be sent before the settings are reloaded.
     }
     return (uchar)isEnd; /* return 1 if this was the last chunk */
   }
