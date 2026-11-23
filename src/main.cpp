@@ -338,12 +338,12 @@ static void featureReportReload(unsigned long now)
   if (featureReportBuf.reportInterval < featureReportBuf.minReportInterval)
     featureReportBuf.reportInterval = featureReportBuf.minReportInterval;
   nextReportTime = now + featureReportBuf.reportInterval; // Set on every change so it can never be older than the overflow-safe comparison allows.
+  previousLux = -INFINITY;                                // Passes both thresholds, so the next measurement is always reported.
 
   switch (featureReportBuf.powerState) // What the computer tells us the required power mode is.
   {
   case HID_USAGE_SENSOR_PROPERTY_POWER_STATE_D0_FULL_POWER_ENUM: // Full power means sampling AND reporting to the computer in regular intervals.
     inputReportBuf.lightValue = 0;
-    previousLux = 0;
   case HID_USAGE_SENSOR_PROPERTY_POWER_STATE_D1_LOW_POWER_ENUM: // Low power means sampling, but not reporting unless the computer explicitly asks for the value.
     // The sensor has to be running in these two modes.
     {
@@ -417,24 +417,6 @@ static bool relativeSensitivityReached(const float &newVal)
   return (newVal <= relativeThresholdLow || newVal >= relativeThresholdHigh);
 }
 
-// Checks if the sensor finished initiliazing, and lets the computer know if that is the case.
-bool checkUpdateState(unsigned long now)
-{
-  if (timeReached(now, timeout))
-  {
-    if (inputReportBuf.sensorState != HID_USAGE_SENSOR_STATE_READY_SEL_ENUM)
-    {
-      inputReportBuf.sensorState = HID_USAGE_SENSOR_STATE_READY_SEL_ENUM;
-      featureReportBuf.sensorState = HID_USAGE_SENSOR_STATE_READY_SEL_ENUM;
-      stateChangePending = true;
-    }
-    // LED_OFF();
-    return true;
-  }
-  // LED_ON();
-  return false;
-}
-
 void loop()
 {
   usbPoll(); // Needs to be called often to keep connection with the computer.
@@ -453,9 +435,15 @@ void loop()
 
   if (inputReportBuf.sensorState == HID_USAGE_SENSOR_STATE_INITIALIZING_SEL_ENUM) // Only after wake up. We cannot report because we are waiting for the first measurement from the sensor.
   {
-    checkUpdateState(now);
+    if (!timeReached(now, timeout))
+      return;
+    inputReportBuf.sensorState = HID_USAGE_SENSOR_STATE_READY_SEL_ENUM;
+    featureReportBuf.sensorState = HID_USAGE_SENSOR_STATE_READY_SEL_ENUM;
+    stateChangePending = true;
+    nextReportTime = now; // The initial sample is reported right after the sensor becomes ready.
   }
-  else if (running && reportingEnabled() && timeReached(now, nextReportTime)) // When it's a time for a report and the computer wants us reporting.
+
+  if (running && reportingEnabled() && timeReached(now, nextReportTime)) // When it's a time for a report and the computer wants us reporting.
   {
     float lux = BH1750::readLux();
     if (lux < 0)
@@ -466,8 +454,6 @@ void loop()
     {
       previousLux = lux;
       inputReportBuf.lightValue = convertLux(lux);
-      inputReportBuf.sensorState = HID_USAGE_SENSOR_STATE_READY_SEL_ENUM;
-      featureReportBuf.sensorState = HID_USAGE_SENSOR_STATE_READY_SEL_ENUM;
       if (featureReportBuf.lightChangeSensitivity == 0 && featureReportBuf.lightChangeSensitivityRel == 0) // Thresholds not set, we should report every change.
         pendingDataEvent = HID_USAGE_SENSOR_EVENT_DATA_UPDATED_SEL_ENUM; // The report is sent because the value changed and no thresholds are set.
       else
