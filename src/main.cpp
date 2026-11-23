@@ -14,6 +14,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <stddef.h>
 #include <util/delay.h>
 
 #include <usbdrv.h>
@@ -40,18 +41,6 @@ PROGMEM const uchar usbHidReportDescriptor[] = {
 
     // feature reports (xmit/receive)
     HID_USAGE_PAGE_SENSOR,
-    // Sensor Connection Type - RO
-    HID_USAGE_SENSOR_PROPERTY_SENSOR_CONNECTION_TYPE, // NAry
-    HID_LOGICAL_MIN_8(1),
-    HID_LOGICAL_MAX_8(3),
-    HID_REPORT_SIZE(8),
-    HID_REPORT_COUNT(1),
-    HID_COLLECTION(Logical),
-    HID_USAGE_SENSOR_PROPERTY_CONNECTION_TYPE_PC_INTEGRATED_SEL,
-    HID_USAGE_SENSOR_PROPERTY_CONNECTION_TYPE_PC_ATTACHED_SEL,
-    HID_USAGE_SENSOR_PROPERTY_CONNECTION_TYPE_PC_EXTERNAL_SEL,
-    HID_FEATURE(Data_Arr_Abs),
-    HID_END_COLLECTION,
     // Reporting State - RW
     HID_USAGE_SENSOR_PROPERTY_REPORTING_STATE,
     HID_LOGICAL_MIN_8(1),
@@ -82,7 +71,46 @@ PROGMEM const uchar usbHidReportDescriptor[] = {
     HID_USAGE_SENSOR_PROPERTY_POWER_STATE_D4_POWER_OFF_SEL,
     HID_FEATURE(Data_Arr_Abs),
     HID_END_COLLECTION,
-    // Sensor State - RW
+    // Report Interval - RW
+    HID_USAGE_SENSOR_PROPERTY_REPORT_INTERVAL,
+    HID_LOGICAL_MIN_8(0),
+    HID_LOGICAL_MAX_32(0xFF, 0xFF, 0xFF, 0x7F),
+    HID_REPORT_SIZE(32),
+    HID_REPORT_COUNT(1),
+    HID_UNIT_EXPONENT(0),
+    HID_FEATURE(Data_Var_Abs),
+    // Change Sensitivity Absolute - RW
+    HID_USAGE_SENSOR_DATA(HID_USAGE_SENSOR_DATA_LIGHT_ILLUMINANCE,
+                          HID_USAGE_SENSOR_DATA_MOD_CHANGE_SENSITIVITY_ABS),
+    HID_LOGICAL_MIN_8(0),
+    HID_LOGICAL_MAX_32(0xFF, 0xFF, 0xFF, 0x7F),
+    HID_REPORT_SIZE(32),
+    HID_REPORT_COUNT(1),
+    HID_UNIT_EXPONENT(0x0C), // scale default unit to provide 4 digits past decimal point
+    HID_FEATURE(Data_Var_Abs),
+    // Change Sensitivity Relative - RW
+    HID_USAGE_SENSOR_DATA(HID_USAGE_SENSOR_DATA_LIGHT_ILLUMINANCE,
+                          HID_USAGE_SENSOR_DATA_MOD_CHANGE_SENSITIVITY_REL_PCT),
+    HID_LOGICAL_MIN_8(0),
+    HID_LOGICAL_MAX_16(0x10, 0x27), // 10000 = 0.00 to 100.00 percent with 2 digits past decimal point
+    HID_REPORT_SIZE(16),
+    HID_REPORT_COUNT(1),
+    HID_UNIT_EXPONENT(0x0E), // scale default unit to provide 2 digits past decimal point
+    HID_FEATURE(Data_Var_Abs),
+    // Read-only fields follow, the host can only write the fields above.
+    // Sensor Connection Type - RO
+    HID_USAGE_SENSOR_PROPERTY_SENSOR_CONNECTION_TYPE, // NAry
+    HID_LOGICAL_MIN_8(1),
+    HID_LOGICAL_MAX_8(3),
+    HID_REPORT_SIZE(8),
+    HID_REPORT_COUNT(1),
+    HID_COLLECTION(Logical),
+    HID_USAGE_SENSOR_PROPERTY_CONNECTION_TYPE_PC_INTEGRATED_SEL,
+    HID_USAGE_SENSOR_PROPERTY_CONNECTION_TYPE_PC_ATTACHED_SEL,
+    HID_USAGE_SENSOR_PROPERTY_CONNECTION_TYPE_PC_EXTERNAL_SEL,
+    HID_FEATURE(Data_Arr_Abs),
+    HID_END_COLLECTION,
+    // Sensor State - RO
     HID_USAGE_SENSOR_STATE,
     HID_LOGICAL_MIN_8(1),
     HID_LOGICAL_MAX_8(7),
@@ -98,14 +126,6 @@ PROGMEM const uchar usbHidReportDescriptor[] = {
     HID_USAGE_SENSOR_STATE_ERROR_SEL,
     HID_FEATURE(Data_Arr_Abs),
     HID_END_COLLECTION,
-    // Report Interval - RW
-    HID_USAGE_SENSOR_PROPERTY_REPORT_INTERVAL,
-    HID_LOGICAL_MIN_8(0),
-    HID_LOGICAL_MAX_32(0xFF, 0xFF, 0xFF, 0x7F),
-    HID_REPORT_SIZE(32),
-    HID_REPORT_COUNT(1),
-    HID_UNIT_EXPONENT(0),
-    HID_FEATURE(Data_Var_Abs),
     // Minimum Report Interval  -  RO
     HID_USAGE_SENSOR_PROPERTY_MINIMUM_REPORT_INTERVAL,
     HID_LOGICAL_MIN_8(0),
@@ -132,8 +152,7 @@ PROGMEM const uchar usbHidReportDescriptor[] = {
     HID_REPORT_COUNT(1),
     HID_UNIT_EXPONENT(0x0C), // scale default unit to provide 4 digits past decimal point
     HID_FEATURE(Data_Var_Abs),
-
-    // Resolution
+    // Resolution - RO
     HID_USAGE_SENSOR_DATA(HID_USAGE_SENSOR_DATA_LIGHT_ILLUMINANCE,
                           HID_USAGE_SENSOR_DATA_MOD_RESOLUTION),
     HID_LOGICAL_MIN_8(0),
@@ -141,26 +160,6 @@ PROGMEM const uchar usbHidReportDescriptor[] = {
     HID_REPORT_SIZE(32),
     HID_REPORT_COUNT(1),
     HID_UNIT_EXPONENT(0x0C), // scale default unit to provide 4 digits past decimal point
-    HID_FEATURE(Data_Var_Abs),
-
-    // Change Sensitivity Absolute - RW
-    HID_USAGE_SENSOR_DATA(HID_USAGE_SENSOR_DATA_LIGHT_ILLUMINANCE,
-                          HID_USAGE_SENSOR_DATA_MOD_CHANGE_SENSITIVITY_ABS),
-    HID_LOGICAL_MIN_8(0),
-    HID_LOGICAL_MAX_32(0xFF, 0xFF, 0xFF, 0x7F),
-    HID_REPORT_SIZE(32),
-    HID_REPORT_COUNT(1),
-    HID_UNIT_EXPONENT(0x0C), // scale default unit to provide 4 digits past decimal point
-    HID_FEATURE(Data_Var_Abs),
-
-    // Change Sensitivity Relative
-    HID_USAGE_SENSOR_DATA(HID_USAGE_SENSOR_DATA_LIGHT_ILLUMINANCE,
-                          HID_USAGE_SENSOR_DATA_MOD_CHANGE_SENSITIVITY_REL_PCT),
-    HID_LOGICAL_MIN_8(0),
-    HID_LOGICAL_MAX_16(0x10, 0x27), // 10000 = 0.00 to 100.00 percent with 2 digits past decimal point
-    HID_REPORT_SIZE(16),
-    HID_REPORT_COUNT(1),
-    HID_UNIT_EXPONENT(0x0E), // scale default unit to provide 2 digits past decimal point
     HID_FEATURE(Data_Var_Abs),
 
     // input reports (transmit)
@@ -216,32 +215,33 @@ static constexpr uint32_t convertLux(float luxSource)
 }
 
 // Feature Report buffer
-struct
+struct FeatureReport
 {
   // common properties
-  uint8_t connectionType;             // HID_USAGE_SENSOR_PROPERTY_SENSOR_CONNECTION_TYPE
   uint8_t reportingState;             // HID_USAGE_SENSOR_PROPERTY_REPORTING_STATE
   uint8_t powerState;                 // HID_USAGE_SENSOR_PROPERTY_POWER_STATE
-  uint8_t sensorState;                // HID_USAGE_SENSOR_STATE
   uint32_t reportInterval;            // HID_USAGE_SENSOR_PROPERTY_REPORT_INTERVAL
+  uint32_t lightChangeSensitivity;    // HID_USAGE_SENSOR_PROPERTY_CHANGE_SENSITIVITY_ABS
+  uint16_t lightChangeSensitivityRel; // HID_USAGE_SENSOR_PROPERTY_CHANGE_SENSITIVITY_REL_PCT
+  // read-only properties, the host writes only the fields above
+  uint8_t connectionType;             // HID_USAGE_SENSOR_PROPERTY_SENSOR_CONNECTION_TYPE
+  uint8_t sensorState;                // HID_USAGE_SENSOR_STATE
   uint8_t minReportInterval;          // HID_USAGE_SENSOR_PROPERTY_MINIMUM_REPORT_INTERVAL
   uint32_t rangeMax;                  // HID_USAGE_SENSOR_PROPERTY_RANGE_MAXIMUM
   uint8_t rangeMin;                   // HID_USAGE_SENSOR_PROPERTY_RANGE_MINIMUM
   uint32_t resolution;                // HID_USAGE_SENSOR_DATA_MOD_RESOLUTION
-  uint32_t lightChangeSensitivity;    // HID_USAGE_SENSOR_PROPERTY_CHANGE_SENSITIVITY_ABS
-  uint16_t lightChangeSensitivityRel; // HID_USAGE_SENSOR_PROPERTY_CHANGE_SENSITIVITY_REL_PCT
 } featureReportBuf = {
-    HID_USAGE_SENSOR_PROPERTY_CONNECTION_TYPE_PC_ATTACHED_SEL_ENUM, // How the device is physically placed relative to the computer. Does not change.
     HID_USAGE_SENSOR_PROPERTY_REPORTING_STATE_NO_EVENTS_SEL_ENUM,   // Computer changes this to let the sensor know if it should send regular reports or not.
     HID_USAGE_SENSOR_PROPERTY_POWER_STATE_D4_POWER_OFF_ENUM,        // Computer changes this to turn the device into low-power state.
-    HID_USAGE_SENSOR_STATE_NO_DATA_SEL_ENUM,                        // Sensor changes this to let the computer know about the current state of the sensor.
     500,                                                            // Default report interval. Driver usually ignores this and sets this field to the minimum allowed.
+    convertLux(0),                                                  // Default absolute sensitivity for reporting (in lux). Computer changes this (and/or the relative counterpart) to limit the amount of reports it gets, to not overwhelm the bus.
+    0,                                                              // Default relative sensitivity for reporting (in percantage, eg. 50 is 50%).
+    HID_USAGE_SENSOR_PROPERTY_CONNECTION_TYPE_PC_ATTACHED_SEL_ENUM, // How the device is physically placed relative to the computer. Does not change.
+    HID_USAGE_SENSOR_STATE_NO_DATA_SEL_ENUM,                        // Sensor changes this to let the computer know about the current state of the sensor.
     250,                                                            // Min. report interval. To comply with standard for ALS, must be <=250. Does not change.
     convertLux(BH1750::absoluteMaximum()),                          // Max. range of the sensor. The library provides it as constexpr. Does not change.
     convertLux(0),                                                  // Min. range of the sensor, is always 0. Does not change.
-    convertLux(BH1750::resolution()),                               // The smallest step the sensor can differentiate. The library provides it as constexpr. For information only. Does not change.
-    convertLux(0),                                                  // Default absolute sensitivity for reporting (in lux). Computer changes this (and/or the relative counterpart) to limit the amount of reports it gets, to not overwhelm the bus.
-    0};                                                             // Default relative sensitivity for reporting (in percantage, eg. 50 is 50%).
+    convertLux(BH1750::resolution())};                              // The smallest step the sensor can differentiate. The library provides it as constexpr. For information only. Does not change.
 
 // Input Report buffer. Contents of this are sent regularly to provide the current sensor values.
 struct
@@ -467,8 +467,8 @@ void loop()
   //_delay_ms(2);
 }
 
-uint8_t *writeBuf;
-uint8_t bytesRemaining;
+uint8_t writeOffset;        // Position in the feature report the host is writing.
+usbMsgLen_t bytesRemaining; // Of the whole transfer, including the read-only fields.
 
 #ifdef __cplusplus
 extern "C"
@@ -518,8 +518,8 @@ extern "C"
         {
         case 0x03: /* Set Feature report */
         {
-          writeBuf = (uchar *)&featureReportBuf;
-          bytesRemaining = min(rq->wLength.word, sizeof(featureReportBuf));
+          writeOffset = 0;
+          bytesRemaining = rq->wLength.word;
           return USB_NO_MSG; /* Use usbFunctionWrite() to get data from host */
         }
         break;
@@ -540,10 +540,10 @@ extern "C"
   {
     if (len > bytesRemaining)
       len = bytesRemaining;
-    for (uint8_t timeoutCounter = 0; timeoutCounter < len; ++timeoutCounter)
-      writeBuf[timeoutCounter] = data[timeoutCounter];
-    writeBuf += len;
-    bytesRemaining -= len;
+    for (uint8_t i = 0; i < len; ++i)
+      if (writeOffset < offsetof(FeatureReport, connectionType)) // Read-only fields are not written.
+        ((uint8_t *)&featureReportBuf)[writeOffset++] = data[i];
+    bytesRemaining -= len; // The transfer ends with its last packet, V-USB would pass any further ones here too.
     bool isEnd = bytesRemaining == 0;
     if (isEnd)
     {
