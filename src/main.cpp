@@ -258,16 +258,37 @@ struct
     0,                                       // The main value of the sensor, in lux (scaled, as the rest).
 };
 
+// Event of the input report waiting for the interrupt endpoint to be free, 0 if none. Handing V-USB a new report before the previous one was sent would overwrite it.
+uint8_t pendingEvent = 0;
+
+static void queueReport(uint8_t event)
+{
+  if (pendingEvent != HID_USAGE_SENSOR_EVENT_STATE_CHANGED_SEL_ENUM) // A pending state change must not be lost, newer data is sent along with it.
+    pendingEvent = event;
+}
+
+static void sendPendingReport()
+{
+  if (pendingEvent && usbInterruptIsReady())
+  {
+    inputReportBuf.eventType = pendingEvent;
+    usbSetInterrupt((uchar *)&inputReportBuf, sizeof(inputReportBuf));
+    pendingEvent = 0;
+  }
+}
+
 // If the I2C fails to cummunicate, the code falls into this. If that happens, check the connection of the sensor and if the I2C pin macros are configured correctly in bh1750.h
 static void error()
 {
   LED_ON();
-  inputReportBuf.eventType = HID_USAGE_SENSOR_EVENT_STATE_CHANGED_SEL_ENUM;
   inputReportBuf.sensorState = HID_USAGE_SENSOR_STATE_ERROR_SEL_ENUM;
   featureReportBuf.sensorState = HID_USAGE_SENSOR_STATE_ERROR_SEL_ENUM;
-  usbSetInterrupt((uchar *)&inputReportBuf, sizeof(inputReportBuf));
+  queueReport(HID_USAGE_SENSOR_EVENT_STATE_CHANGED_SEL_ENUM);
   while (true)
+  {
     usbPoll();
+    sendPendingReport();
+  }
 }
 
 void setup()
@@ -322,8 +343,7 @@ static void featureReportReload()
         running = true;
         inputReportBuf.sensorState = HID_USAGE_SENSOR_STATE_INITIALIZING_SEL_ENUM;
         featureReportBuf.sensorState = HID_USAGE_SENSOR_STATE_INITIALIZING_SEL_ENUM;
-        inputReportBuf.eventType = HID_USAGE_SENSOR_EVENT_STATE_CHANGED_SEL_ENUM;
-        usbSetInterrupt((uchar *)&inputReportBuf, sizeof(inputReportBuf));
+        queueReport(HID_USAGE_SENSOR_EVENT_STATE_CHANGED_SEL_ENUM);
       }
     }
     break;
@@ -336,8 +356,7 @@ static void featureReportReload()
       running = false;
       inputReportBuf.sensorState = HID_USAGE_SENSOR_STATE_NO_DATA_SEL_ENUM;
       featureReportBuf.sensorState = HID_USAGE_SENSOR_STATE_NO_DATA_SEL_ENUM;
-      inputReportBuf.eventType = HID_USAGE_SENSOR_EVENT_STATE_CHANGED_SEL_ENUM;
-      usbSetInterrupt((uchar *)&inputReportBuf, sizeof(inputReportBuf));
+      queueReport(HID_USAGE_SENSOR_EVENT_STATE_CHANGED_SEL_ENUM);
     }
   }
   break;
@@ -378,8 +397,7 @@ bool checkUpdateState()
     {
       inputReportBuf.sensorState = HID_USAGE_SENSOR_STATE_READY_SEL_ENUM;
       featureReportBuf.sensorState = HID_USAGE_SENSOR_STATE_READY_SEL_ENUM;
-      inputReportBuf.eventType = HID_USAGE_SENSOR_EVENT_STATE_CHANGED_SEL_ENUM;
-      usbSetInterrupt((uchar *)&inputReportBuf, sizeof(inputReportBuf));
+      queueReport(HID_USAGE_SENSOR_EVENT_STATE_CHANGED_SEL_ENUM);
     }
     // LED_OFF();
     return true;
@@ -391,6 +409,7 @@ bool checkUpdateState()
 void loop()
 {
   usbPoll(); // Needs to be called often to keep connection with the computer.
+  sendPendingReport();
 
   if(featureReportChanged)
   {
@@ -412,14 +431,12 @@ void loop()
     {
       previousLux = lux;
       inputReportBuf.lightValue = convertLux(lux);
-      if (featureReportBuf.lightChangeSensitivity == 0 && featureReportBuf.lightChangeSensitivityRel == 0) // Thresholds not set, we should report every change.
-        inputReportBuf.eventType = HID_USAGE_SENSOR_EVENT_DATA_UPDATED_SEL_ENUM; // The report is sent because the value changed and no thresholds are set.
-      else
-        inputReportBuf.eventType = HID_USAGE_SENSOR_EVENT_CHANGE_SENSITIVITY_SEL_ENUM; // The report is sent because the thresholds are met.
-
       inputReportBuf.sensorState = HID_USAGE_SENSOR_STATE_READY_SEL_ENUM;
       featureReportBuf.sensorState = HID_USAGE_SENSOR_STATE_READY_SEL_ENUM;
-      usbSetInterrupt((uchar *)&inputReportBuf, sizeof(inputReportBuf)); // Send it
+      if (featureReportBuf.lightChangeSensitivity == 0 && featureReportBuf.lightChangeSensitivityRel == 0) // Thresholds not set, we should report every change.
+        queueReport(HID_USAGE_SENSOR_EVENT_DATA_UPDATED_SEL_ENUM); // The report is sent because the value changed and no thresholds are set.
+      else
+        queueReport(HID_USAGE_SENSOR_EVENT_CHANGE_SENSITIVITY_SEL_ENUM); // The report is sent because the thresholds are met.
     }
     nextReportTime = millis() + featureReportBuf.reportInterval;
   }
@@ -498,7 +515,11 @@ extern "C"
     bytesRemaining -= len;
     bool isEnd = bytesRemaining == 0;
     if (isEnd)
+    {
       featureReportChanged = true;
+      if (pendingEvent != HID_USAGE_SENSOR_EVENT_STATE_CHANGED_SEL_ENUM) // A sample still waiting for the endpoint was taken under the old settings, which may not allow reporting. Dropped here, it could be sent before the settings are reloaded.
+        pendingEvent = 0;
+    }
     return (uchar)isEnd; /* return 1 if this was the last chunk */
   }
 #ifdef __cplusplus
