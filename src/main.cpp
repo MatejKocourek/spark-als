@@ -448,16 +448,12 @@ void loop()
     float lux = BH1750::readLux();
     if (lux < 0)
       error();
-    // uint32_t convertedLux = convertLux(lux);
-    // if (convertedLux != inputReportBuf.lightValue) // If the value is the same as last time, it should not be sent -> OR DOES IT? NEEDS INVESTIGATING, DOCUMENTATION NOT CLEAR
-    if (relativeSensitivityReached(lux) && absoluteSensitivityReached(lux)) // Checks if the value is in the threshold. When both thresholds are set, both needs to be met.
+    bool streaming = featureReportBuf.lightChangeSensitivity == 0 && featureReportBuf.lightChangeSensitivityRel == 0; // Thresholds not set, every sample is reported.
+    if (streaming || (lux != previousLux && relativeSensitivityReached(lux) && absoluteSensitivityReached(lux))) // Otherwise both thresholds need to be met and an unchanged value (e.g. in darkness) is not reported.
     {
       previousLux = lux;
       inputReportBuf.lightValue = convertLux(lux);
-      if (featureReportBuf.lightChangeSensitivity == 0 && featureReportBuf.lightChangeSensitivityRel == 0) // Thresholds not set, we should report every change.
-        pendingDataEvent = HID_USAGE_SENSOR_EVENT_DATA_UPDATED_SEL_ENUM; // The report is sent because the value changed and no thresholds are set.
-      else
-        pendingDataEvent = HID_USAGE_SENSOR_EVENT_CHANGE_SENSITIVITY_SEL_ENUM; // The report is sent because the thresholds are met.
+      pendingDataEvent = streaming ? HID_USAGE_SENSOR_EVENT_DATA_UPDATED_SEL_ENUM : HID_USAGE_SENSOR_EVENT_CHANGE_SENSITIVITY_SEL_ENUM;
     }
     nextReportTime = now + featureReportBuf.reportInterval;
   }
