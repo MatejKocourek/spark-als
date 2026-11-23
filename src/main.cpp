@@ -17,7 +17,10 @@
 #include <stddef.h>
 #include <util/delay.h>
 
+extern "C"
+{
 #include <usbdrv.h>
+}
 #include "HidSensorSpec.h"
 #include "bh1750.h"
 
@@ -34,7 +37,10 @@ static constexpr uint32_t exponentLux = 10000u;
 static constexpr unsigned long sensorMeasurementTime = 500u;
 
 // HID Report Descriptor
-PROGMEM const uchar usbHidReportDescriptor[] = {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wnarrowing" // V-USB declares the descriptor as char, but its bytes go up to 0xFF.
+#pragma GCC diagnostic ignored "-Woverflow"
+PROGMEM const char usbHidReportDescriptor[] = {
     HID_USAGE_PAGE_SENSOR,                    // USAGE_PAGE (Sensor)
     HID_USAGE_SENSOR_TYPE_LIGHT_AMBIENTLIGHT, // USAGE (AmbientLight)
     HID_COLLECTION(Application),
@@ -205,6 +211,7 @@ PROGMEM const uchar usbHidReportDescriptor[] = {
     HID_INPUT(Data_Var_Abs),
 
     HID_END_COLLECTION};
+#pragma GCC diagnostic pop
 
 static_assert(sizeof(usbHidReportDescriptor) == USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH, "Update USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH in usbconfig.h");
 

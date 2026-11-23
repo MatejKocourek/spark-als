@@ -34,8 +34,12 @@ Note: with `platformIO` you don't need the Arduino IDE and install libraries, th
 
 Compiling and installing:
 ``` bash
+git clone --recurse-submodules https://github.com/MatejKocourek/spark-als.git
+cd spark-als
 pio run --target upload
 ```
+
+V-USB is included as a git submodule in `external/v-usb`. If you cloned without `--recurse-submodules`, the build fetches it automatically. A downloaded ZIP archive does not contain it, so clone the repository instead.
 
 Note: you need connect your Digispark after each compiling for upload the new firmware or reset it. More info [here](http://digistump.com/wiki/digispark/tutorials/connectingpro).
 
