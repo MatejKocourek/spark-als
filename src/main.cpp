@@ -321,17 +321,23 @@ bool running = false;              // If the sensor is currently sampling data.
 bool featureReportChanged = false; // If the computer changed the feature report.
 float previousLux = 0;             // For the sensitivty functionality.
 
+// Checks if the given time has passed, also when millis() overflows (every ~49 days).
+static bool timeReached(unsigned long now, unsigned long time)
+{
+  return long(now - time) >= 0;
+}
+
 
 // Computer changed the feature report, restart everything.
-static void featureReportReload()
+static void featureReportReload(unsigned long now)
 {
   if (featureReportBuf.reportInterval < featureReportBuf.minReportInterval)
     featureReportBuf.reportInterval = featureReportBuf.minReportInterval;
+  nextReportTime = now + featureReportBuf.reportInterval; // Set on every change so it can never be older than the overflow-safe comparison allows.
 
   switch (featureReportBuf.powerState) // What the computer tells us the required power mode is.
   {
   case HID_USAGE_SENSOR_PROPERTY_POWER_STATE_D0_FULL_POWER_ENUM: // Full power means sampling AND reporting to the computer in regular intervals.
-    nextReportTime = millis() + featureReportBuf.reportInterval;
     inputReportBuf.lightValue = 0;
     previousLux = 0;
   case HID_USAGE_SENSOR_PROPERTY_POWER_STATE_D1_LOW_POWER_ENUM: // Low power means sampling, but not reporting unless the computer explicitly asks for the value.
@@ -341,7 +347,7 @@ static void featureReportReload()
       {
         if (!BH1750::start())
           error();
-        timeout = millis() + sensorMeasurementTime;
+        timeout = now + sensorMeasurementTime;
         running = true;
         inputReportBuf.sensorState = HID_USAGE_SENSOR_STATE_INITIALIZING_SEL_ENUM;
         featureReportBuf.sensorState = HID_USAGE_SENSOR_STATE_INITIALIZING_SEL_ENUM;
@@ -408,9 +414,9 @@ static bool relativeSensitivityReached(const float &newVal)
 }
 
 // Checks if the sensor finished initiliazing, and lets the computer know if that is the case.
-bool checkUpdateState()
+bool checkUpdateState(unsigned long now)
 {
-  if (millis() >= timeout)
+  if (timeReached(now, timeout))
   {
     if (inputReportBuf.sensorState != HID_USAGE_SENSOR_STATE_READY_SEL_ENUM)
     {
@@ -429,22 +435,23 @@ void loop()
 {
   usbPoll(); // Needs to be called often to keep connection with the computer.
   sendPendingReport();
+  unsigned long now = millis();
 
   if (inputReportBuf.sensorState == HID_USAGE_SENSOR_STATE_ERROR_SEL_ENUM) // Sensor failed while answering a GET_REPORT, which cannot block in error().
     error();
 
   if(featureReportChanged)
   {
-    featureReportReload();
+    featureReportReload(now);
     featureReportChanged = false;
     return;
   }
 
   if (inputReportBuf.sensorState == HID_USAGE_SENSOR_STATE_INITIALIZING_SEL_ENUM) // Only after wake up. We cannot report because we are waiting for the first measurement from the sensor.
   {
-    checkUpdateState();
+    checkUpdateState(now);
   }
-  else if (running && reportingEnabled() && (millis() >= nextReportTime)) // When it's a time for a report and the computer wants us reporting.
+  else if (running && reportingEnabled() && timeReached(now, nextReportTime)) // When it's a time for a report and the computer wants us reporting.
   {
     float lux = BH1750::readLux();
     if (lux < 0)
@@ -462,7 +469,7 @@ void loop()
       else
         queueReport(HID_USAGE_SENSOR_EVENT_CHANGE_SENSITIVITY_SEL_ENUM); // The report is sent because the thresholds are met.
     }
-    nextReportTime = millis() + featureReportBuf.reportInterval;
+    nextReportTime = now + featureReportBuf.reportInterval;
   }
   //_delay_ms(2);
 }
