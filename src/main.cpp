@@ -33,7 +33,7 @@ static constexpr uint32_t exponentLux = 10000u;
 static constexpr unsigned long sensorMeasurementTime = 500u;
 
 // HID Report Descriptor
-PROGMEM const uchar usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH] = {
+PROGMEM const uchar usbHidReportDescriptor[] = {
     HID_USAGE_PAGE_SENSOR,                    // USAGE_PAGE (Sensor)
     HID_USAGE_SENSOR_TYPE_LIGHT_AMBIENTLIGHT, // USAGE (AmbientLight)
     HID_COLLECTION(Application),
@@ -101,7 +101,7 @@ PROGMEM const uchar usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH]
     // Report Interval - RW
     HID_USAGE_SENSOR_PROPERTY_REPORT_INTERVAL,
     HID_LOGICAL_MIN_8(0),
-    HID_LOGICAL_MAX_32(0xFF, 0xFF, 0xFF, 0xFF),
+    HID_LOGICAL_MAX_32(0xFF, 0xFF, 0xFF, 0x7F),
     HID_REPORT_SIZE(32),
     HID_REPORT_COUNT(1),
     HID_UNIT_EXPONENT(0),
@@ -109,7 +109,7 @@ PROGMEM const uchar usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH]
     // Minimum Report Interval  -  RO
     HID_USAGE_SENSOR_PROPERTY_MINIMUM_REPORT_INTERVAL,
     HID_LOGICAL_MIN_8(0),
-    HID_LOGICAL_MAX_8(0xFF),
+    HID_LOGICAL_MAX_16(0xFF, 0x00),
     HID_REPORT_SIZE(8),
     HID_REPORT_COUNT(1),
     HID_UNIT_EXPONENT(0),
@@ -118,7 +118,7 @@ PROGMEM const uchar usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH]
     HID_USAGE_SENSOR_DATA(HID_USAGE_SENSOR_DATA_LIGHT_ILLUMINANCE,
                           HID_USAGE_SENSOR_DATA_MOD_MAX),
     HID_LOGICAL_MIN_8(0),
-    HID_LOGICAL_MAX_32(0xFF, 0xFF, 0xFF, 0xFF),
+    HID_LOGICAL_MAX_32(0xFF, 0xFF, 0xFF, 0x7F),
     HID_REPORT_SIZE(32),
     HID_REPORT_COUNT(1),
     HID_UNIT_EXPONENT(0x0C), // scale default unit to provide 4 digits past decimal point
@@ -127,7 +127,7 @@ PROGMEM const uchar usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH]
     HID_USAGE_SENSOR_DATA(HID_USAGE_SENSOR_DATA_LIGHT_ILLUMINANCE,
                           HID_USAGE_SENSOR_DATA_MOD_MIN),
     HID_LOGICAL_MIN_8(0),
-    HID_LOGICAL_MAX_8(0xFF),
+    HID_LOGICAL_MAX_16(0xFF, 0x00),
     HID_REPORT_SIZE(8),
     HID_REPORT_COUNT(1),
     HID_UNIT_EXPONENT(0x0C), // scale default unit to provide 4 digits past decimal point
@@ -137,7 +137,7 @@ PROGMEM const uchar usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH]
     HID_USAGE_SENSOR_DATA(HID_USAGE_SENSOR_DATA_LIGHT_ILLUMINANCE,
                           HID_USAGE_SENSOR_DATA_MOD_RESOLUTION),
     HID_LOGICAL_MIN_8(0),
-    HID_LOGICAL_MAX_32(0xFF, 0xFF, 0xFF, 0xFF),
+    HID_LOGICAL_MAX_32(0xFF, 0xFF, 0xFF, 0x7F),
     HID_REPORT_SIZE(32),
     HID_REPORT_COUNT(1),
     HID_UNIT_EXPONENT(0x0C), // scale default unit to provide 4 digits past decimal point
@@ -147,7 +147,7 @@ PROGMEM const uchar usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH]
     HID_USAGE_SENSOR_DATA(HID_USAGE_SENSOR_DATA_LIGHT_ILLUMINANCE,
                           HID_USAGE_SENSOR_DATA_MOD_CHANGE_SENSITIVITY_ABS),
     HID_LOGICAL_MIN_8(0),
-    HID_LOGICAL_MAX_32(0xFF, 0xFF, 0xFF, 0xFF),
+    HID_LOGICAL_MAX_32(0xFF, 0xFF, 0xFF, 0x7F),
     HID_REPORT_SIZE(32),
     HID_REPORT_COUNT(1),
     HID_UNIT_EXPONENT(0x0C), // scale default unit to provide 4 digits past decimal point
@@ -199,7 +199,7 @@ PROGMEM const uchar usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH]
     // Sensor data
     HID_USAGE_SENSOR_DATA_LIGHT_ILLUMINANCE,
     HID_LOGICAL_MIN_8(0),
-    HID_LOGICAL_MAX_32(0xFF, 0xFF, 0xFF, 0xFF),
+    HID_LOGICAL_MAX_32(0xFF, 0xFF, 0xFF, 0x7F),
     HID_UNIT_EXPONENT(0x0C), // scale default unit to provide 4 digits past decimal point
     HID_REPORT_SIZE(32),
     HID_REPORT_COUNT(1),
@@ -207,7 +207,7 @@ PROGMEM const uchar usbHidReportDescriptor[USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH]
 
     HID_END_COLLECTION};
 
-// char (*__kaboom)[sizeof(usbHidReportDescriptor)] = 1;
+static_assert(sizeof(usbHidReportDescriptor) == USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH, "Update USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH in usbconfig.h");
 
 // Converts the floating point value into fixed point decimal.
 static constexpr uint32_t convertLux(float luxSource)
