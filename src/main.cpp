@@ -318,6 +318,11 @@ void setup()
   LED_OUT();
   LED_OFF();
 
+  // Turn off unused peripherals to save power. Timer1 is used by millis().
+  ADCSRA = 0;
+  ACSR = 1 << ACD;
+  PRR = (1 << PRTIM0) | (1 << PRUSI) | (1 << PRADC);
+
   noInterrupts();
   usbInit();
   usbDeviceDisconnect(); /* enforce re-enumeration */
