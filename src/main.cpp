@@ -321,9 +321,14 @@ static void suspend()
 
 uint8_t lastBusActivity = 0; // Low byte of millis(), enough to measure the 3 ms.
 
+extern "C" uchar usbRxBuf[]; // V-USB's two receive buffers, each starts with the PID of the packet.
+
 static void poll()
 {
   usbPoll();
+  // A bus reset enters V-USB's interrupt on D- as an empty packet, which V-USB handles by the PID left from the previous packet.
+  // It would answer e.g. an old IN token in the middle of the reset, and the device could not enumerate again. PID 0 is ignored.
+  usbRxBuf[0] = usbRxBuf[USB_BUFSIZE] = 0;
   sendPendingReport();
   uint8_t now = millis();
   if (usbSofCount) // A keep-alive was received since the last check. During a reset or resume suspend() returns immediately.
