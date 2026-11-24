@@ -409,6 +409,13 @@ bool running = false;              // If the sensor is currently sampling data.
 bool featureReportChanged = false; // If the computer changed the feature report.
 float previousLux = 0;             // For the sensitivty functionality.
 
+// Puts a sample into the input report. Thresholds are relative to the last sample the host got.
+__attribute__((noinline)) static void setLux(float lux) // Not inlined into its two callers, saves flash.
+{
+  previousLux = lux;
+  inputReportBuf.lightValue = convertLux(lux);
+}
+
 
 // Checks if the given time has passed, also when millis() overflows (every ~49 days).
 static bool timeReached(unsigned long now, unsigned long time)
@@ -540,8 +547,7 @@ void loop()
     if (streaming || (lux != previousLux && relativeSensitivityReached(lux)))
 #endif
     {
-      previousLux = lux;
-      inputReportBuf.lightValue = convertLux(lux);
+      setLux(lux);
       pendingDataEvent = streaming ? HID_USAGE_SENSOR_EVENT_DATA_UPDATED_SEL_ENUM : HID_USAGE_SENSOR_EVENT_CHANGE_SENSITIVITY_SEL_ENUM;
     }
     nextReportTime = now + featureReportBuf.reportInterval;
@@ -583,7 +589,7 @@ extern "C"
             if (lux < 0)
               inputReportBuf.sensorState = HID_USAGE_SENSOR_STATE_ERROR_SEL_ENUM; // loop() calls error()
             else
-              inputReportBuf.lightValue = convertLux(lux);
+              setLux(lux);
           }
           usbMsgPtr = (uchar *)&inputReportBuf;
           return sizeof(inputReportBuf);
