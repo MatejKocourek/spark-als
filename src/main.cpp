@@ -433,8 +433,8 @@ static void featureReportReload(unsigned long now)
 
   switch (featureReportBuf.powerState) // What the computer tells us the required power mode is.
   {
-  case HID_USAGE_SENSOR_PROPERTY_POWER_STATE_D0_FULL_POWER_ENUM: // Full power means sampling AND reporting to the computer in regular intervals.
-  case HID_USAGE_SENSOR_PROPERTY_POWER_STATE_D1_LOW_POWER_ENUM: // Low power means sampling, but not reporting unless the computer explicitly asks for the value.
+  case HID_USAGE_SENSOR_PROPERTY_POWER_STATE_D0_FULL_POWER_ENUM: // Full power: the sensor runs.
+  case HID_USAGE_SENSOR_PROPERTY_POWER_STATE_D1_LOW_POWER_ENUM: // This sensor has no lower power mode, D1 works as D0. Whether to report is up to the reporting state.
     // The sensor has to be running in these two modes.
     {
       if (!running)
