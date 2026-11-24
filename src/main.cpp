@@ -15,7 +15,6 @@
  */
 
 #include <stddef.h>
-#include <avr/sleep.h>
 #include <util/delay.h>
 
 extern "C"
@@ -24,6 +23,9 @@ extern "C"
 }
 #include "HidSensorSpec.h"
 #include "bh1750.h"
+#if FEATURE_USB_SUSPEND
+#include <avr/sleep.h>
+#endif
 
 #define LED_OUT() pinMode(LED_BUILTIN, OUTPUT)
 #define LED_OFF() digitalWrite(LED_BUILTIN, 0)
@@ -86,6 +88,7 @@ PROGMEM const char usbHidReportDescriptor[] = {
     HID_REPORT_COUNT(1),
     HID_UNIT_EXPONENT(0),
     HID_FEATURE(Data_Var_Abs),
+#if FEATURE_ABSOLUTE_SENSITIVITY
     // Change Sensitivity Absolute - RW
     HID_USAGE_SENSOR_DATA(HID_USAGE_SENSOR_DATA_LIGHT_ILLUMINANCE,
                           HID_USAGE_SENSOR_DATA_MOD_CHANGE_SENSITIVITY_ABS),
@@ -95,6 +98,7 @@ PROGMEM const char usbHidReportDescriptor[] = {
     HID_REPORT_COUNT(1),
     HID_UNIT_EXPONENT(0x0C), // scale default unit to provide 4 digits past decimal point
     HID_FEATURE(Data_Var_Abs),
+#endif
     // Change Sensitivity Relative - RW
     HID_USAGE_SENSOR_DATA(HID_USAGE_SENSOR_DATA_LIGHT_ILLUMINANCE,
                           HID_USAGE_SENSOR_DATA_MOD_CHANGE_SENSITIVITY_REL_PCT),
@@ -141,6 +145,7 @@ PROGMEM const char usbHidReportDescriptor[] = {
     HID_REPORT_COUNT(1),
     HID_UNIT_EXPONENT(0),
     HID_FEATURE(Data_Var_Abs),
+#if FEATURE_RANGE_PROPERTIES
     // Range Maximum - RO
     HID_USAGE_SENSOR_DATA(HID_USAGE_SENSOR_DATA_LIGHT_ILLUMINANCE,
                           HID_USAGE_SENSOR_DATA_MOD_MAX),
@@ -168,6 +173,7 @@ PROGMEM const char usbHidReportDescriptor[] = {
     HID_REPORT_COUNT(1),
     HID_UNIT_EXPONENT(0x0C), // scale default unit to provide 4 digits past decimal point
     HID_FEATURE(Data_Var_Abs),
+#endif
 
     // input reports (transmit)
     HID_USAGE_PAGE_SENSOR,
@@ -237,27 +243,36 @@ struct FeatureReport
   uint8_t reportingState;             // HID_USAGE_SENSOR_PROPERTY_REPORTING_STATE
   uint8_t powerState;                 // HID_USAGE_SENSOR_PROPERTY_POWER_STATE
   uint32_t reportInterval;            // HID_USAGE_SENSOR_PROPERTY_REPORT_INTERVAL
+#if FEATURE_ABSOLUTE_SENSITIVITY
   uint32_t lightChangeSensitivity;    // HID_USAGE_SENSOR_PROPERTY_CHANGE_SENSITIVITY_ABS
+#endif
   uint16_t lightChangeSensitivityRel; // HID_USAGE_SENSOR_PROPERTY_CHANGE_SENSITIVITY_REL_PCT
   // read-only properties, the host writes only the fields above
   uint8_t connectionType;             // HID_USAGE_SENSOR_PROPERTY_SENSOR_CONNECTION_TYPE
   uint8_t sensorState;                // HID_USAGE_SENSOR_STATE
   uint8_t minReportInterval;          // HID_USAGE_SENSOR_PROPERTY_MINIMUM_REPORT_INTERVAL
+#if FEATURE_RANGE_PROPERTIES
   uint32_t rangeMax;                  // HID_USAGE_SENSOR_PROPERTY_RANGE_MAXIMUM
   uint8_t rangeMin;                   // HID_USAGE_SENSOR_PROPERTY_RANGE_MINIMUM
   uint32_t resolution;                // HID_USAGE_SENSOR_DATA_MOD_RESOLUTION
+#endif
 } featureReportBuf = {
     HID_USAGE_SENSOR_PROPERTY_REPORTING_STATE_NO_EVENTS_SEL_ENUM,   // Computer changes this to let the sensor know if it should send regular reports or not.
     HID_USAGE_SENSOR_PROPERTY_POWER_STATE_D4_POWER_OFF_ENUM,        // Computer changes this to turn the device into low-power state.
     500,                                                            // Default report interval. Driver usually ignores this and sets this field to the minimum allowed.
+#if FEATURE_ABSOLUTE_SENSITIVITY
     convertLux(0),                                                  // Default absolute sensitivity for reporting (in lux). Computer changes this (and/or the relative counterpart) to limit the amount of reports it gets, to not overwhelm the bus.
+#endif
     0,                                                              // Default relative sensitivity for reporting (in percantage, eg. 50 is 50%).
     HID_USAGE_SENSOR_PROPERTY_CONNECTION_TYPE_PC_ATTACHED_SEL_ENUM, // How the device is physically placed relative to the computer. Does not change.
     HID_USAGE_SENSOR_STATE_NO_DATA_SEL_ENUM,                        // Sensor changes this to let the computer know about the current state of the sensor.
     250,                                                            // Min. report interval. To comply with standard for ALS, must be <=250. Does not change.
+#if FEATURE_RANGE_PROPERTIES
     convertLux(BH1750::absoluteMaximum()),                          // Max. range of the sensor. The library provides it as constexpr. Does not change.
     convertLux(0),                                                  // Min. range of the sensor, is always 0. Does not change.
-    convertLux(BH1750::resolution())};                              // The smallest step the sensor can differentiate. The library provides it as constexpr. For information only. Does not change.
+    convertLux(BH1750::resolution()),                               // The smallest step the sensor can differentiate. The library provides it as constexpr. For information only. Does not change.
+#endif
+};
 
 // Input Report buffer. Contents of this are sent regularly to provide the current sensor values.
 struct
@@ -299,6 +314,7 @@ static void sendPendingReport()
   }
 }
 
+#if FEATURE_USB_SUSPEND
 // The host suspends the bus by stopping the keep-alive pulses, sent every 1 ms while it is active. After 3 ms the device has to save power.
 // Power-down cannot be used, waking from it takes over 64 ms with the PLL clock (SUT fuses), but USB allows only 10 ms after resume.
 // Idle with the clock divided by 16 instead. V-USB's interrupt still runs on the wake-up edge, but too slowly to receive anything.
@@ -320,16 +336,20 @@ static void suspend()
 }
 
 uint8_t lastBusActivity = 0; // Low byte of millis(), enough to measure the 3 ms.
+#endif
 
 extern "C" uchar usbRxBuf[]; // V-USB's two receive buffers, each starts with the PID of the packet.
 
 static void poll()
 {
   usbPoll();
+#if USB_COUNT_SOF
   // A bus reset enters V-USB's interrupt on D- as an empty packet, which V-USB handles by the PID left from the previous packet.
   // It would answer e.g. an old IN token in the middle of the reset, and the device could not enumerate again. PID 0 is ignored.
   usbRxBuf[0] = usbRxBuf[USB_BUFSIZE] = 0;
+#endif
   sendPendingReport();
+#if FEATURE_USB_SUSPEND
   uint8_t now = millis();
   if (usbSofCount) // A keep-alive was received since the last check. During a reset or resume suspend() returns immediately.
   {
@@ -338,6 +358,7 @@ static void poll()
   }
   else if (uint8_t(now - lastBusActivity) > 3)
     suspend();
+#endif
 }
 
 // If the I2C fails to cummunicate, the code falls into this. If that happens, check the connection of the sensor and if the I2C pin macros are configured correctly in bh1750.h
@@ -359,10 +380,12 @@ void setup()
   LED_OUT();
   LED_OFF();
 
+#if FEATURE_PERIPHERALS_OFF
   // Turn off unused peripherals to save power. Timer1 is used by millis().
   ADCSRA = 0;
   ACSR = 1 << ACD;
   PRR = (1 << PRTIM0) | (1 << PRUSI) | (1 << PRADC);
+#endif
 
   noInterrupts();
   usbInit();
@@ -458,6 +481,7 @@ static bool reportingEnabled()
   }
 }
 
+#if FEATURE_ABSOLUTE_SENSITIVITY
 // Checks if our new value has broken out of the threshold the computer set, in lux.
 static bool absoluteSensitivityReached(const float &newVal)
 {
@@ -467,6 +491,7 @@ static bool absoluteSensitivityReached(const float &newVal)
 
   return (newVal <= absoluteThresholdLow || newVal >= absoluteThresholdHigh);
 }
+#endif
 // Checks if our new value has broken out of the threshold the computer set, in percantage of the old value.
 static bool relativeSensitivityReached(const float &newVal)
 {
@@ -507,8 +532,13 @@ void loop()
     float lux = BH1750::readLux();
     if (lux < 0)
       error();
+#if FEATURE_ABSOLUTE_SENSITIVITY
     bool streaming = featureReportBuf.lightChangeSensitivity == 0 && featureReportBuf.lightChangeSensitivityRel == 0; // Thresholds not set, every sample is reported.
     if (streaming || (lux != previousLux && relativeSensitivityReached(lux) && absoluteSensitivityReached(lux))) // Otherwise both thresholds need to be met and an unchanged value (e.g. in darkness) is not reported.
+#else
+    bool streaming = featureReportBuf.lightChangeSensitivityRel == 0;
+    if (streaming || (lux != previousLux && relativeSensitivityReached(lux)))
+#endif
     {
       previousLux = lux;
       inputReportBuf.lightValue = convertLux(lux);

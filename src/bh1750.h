@@ -14,7 +14,10 @@
 // #define I2C_HARDWARE 1 //If your device supports hardware I2C, turn this on to increase speed and decrease code size.
 
 #define I2C_FASTMODE 1 // Disable only when troubleshooting.
+#include "alsconfig.h"
+#if FEATURE_I2C_TIMEOUT
 #define I2C_TIMEOUT 10 // ms. A stuck bus (e.g. a disconnected sensor, the pull-ups are on its module) is then reported as an error instead of waiting forever.
+#endif
 #include <SoftI2CMaster.h>
 
 namespace BH1750
@@ -83,8 +86,10 @@ namespace BH1750
             buff[0] = i2c_read(false);
             buff[1] = i2c_read(true);
             i2c_stop();
+#if FEATURE_I2C_TIMEOUT
             if (!(_SFR_IO8(SCL_IN) & (1 << SCL_PIN))) // A read that timed out returns a partial byte, but SCL stays stuck low.
                 return -1;
+#endif
 
             return (uint16_t(buff[0]) << 8) | buff[1];
         }

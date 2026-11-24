@@ -41,6 +41,17 @@ pio run --target upload
 
 V-USB is included as a git submodule in `external/v-usb`. If you cloned without `--recurse-submodules` or downloaded a ZIP archive, the build fetches it automatically.
 
+## Optional features
+Features that the standards do not require can be turned off to save flash, in `include/alsconfig.h` or with `build_flags = -D <NAME>=0` in `platformio.ini`:
+
+| Define | Feature | Flash saved |
+|---|---|---|
+| `FEATURE_USB_SUSPEND` | Sleep while the USB bus is suspended (required by USB 2.0) | 116 B |
+| `FEATURE_PERIPHERALS_OFF` | Turn off the unused peripherals | 10 B |
+| `FEATURE_ABSOLUTE_SENSITIVITY` | Absolute (lux) change sensitivity, Windows requires only the relative one | 148 B |
+| `FEATURE_RANGE_PROPERTIES` | Range maximum, range minimum and resolution properties | 62 B |
+| `FEATURE_I2C_TIMEOUT` | Report a stuck I2C bus as an error instead of hanging | 34 B |
+
 Note: you need connect your Digispark after each compiling for upload the new firmware or reset it. More info [here](http://digistump.com/wiki/digispark/tutorials/connectingpro).
 
 ## License

@@ -10,6 +10,8 @@
 #ifndef __usbconfig_h_included__
 #define __usbconfig_h_included__
 
+#include "alsconfig.h"
+
 /*
 General Description:
 This file is an example configuration (with inline documentation) for the USB
@@ -171,7 +173,7 @@ section at the end of this file).
 /* This macro (if defined) is executed when a USB SET_ADDRESS request was
  * received.
  */
-#define USB_COUNT_SOF                   1 /* to detect USB suspend */
+#define USB_COUNT_SOF                   FEATURE_USB_SUSPEND /* to detect USB suspend */
 /* define this macro to 1 if you need the global variable "usbSofCount" which
  * counts SOF packets. This feature requires that the hardware interrupt is
  * connected to D- instead of D+.
@@ -271,7 +273,7 @@ section at the end of this file).
  * HID class is 3, no subclass and protocol required (but may be useful!)
  * CDC class is 2, use subclass 2 and protocol 1 for ACM
  */
-#define USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH    350
+#define USB_CFG_HID_REPORT_DESCRIPTOR_LENGTH    (350 - 18 * !FEATURE_ABSOLUTE_SENSITIVITY - 52 * !FEATURE_RANGE_PROPERTIES)
 /* Define this to the length of the HID report descriptor, if you implement
  * an HID device. Otherwise don't define it or define it to 0.
  * If you use this define, you must add a PROGMEM character array named
@@ -374,7 +376,11 @@ section at the end of this file).
 /* #define USB_INTR_VECTOR         INT0_vect */
 
 #define USB_INTR_CFG            PCMSK // Pin interrupt enable register
+#if USB_COUNT_SOF
 #define USB_INTR_CFG_SET        (1 << USB_CFG_DMINUS_BIT) // Mask for pin in pin interrupt enable register PCMSK to be set on usbInit. D- because USB_COUNT_SOF needs it.
+#else
+#define USB_INTR_CFG_SET        (1 << USB_CFG_DPLUS_BIT) // Mask for pin in pin interrupt enable register PCMSK to be set on usbInit
+#endif
 #define USB_INTR_CFG_CLR        0 // Mask for pin in pin interrupt enable register PCMSK to be cleared on usbInit. 0 = no clear
 #define USB_INTR_ENABLE         GIMSK // Global interrupt enable register
 #define USB_INTR_ENABLE_BIT     PCIE  // Bit position in global interrupt enable register
