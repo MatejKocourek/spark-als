@@ -14,6 +14,10 @@
 // #define I2C_HARDWARE 1 //If your device supports hardware I2C, turn this on to increase speed and decrease code size.
 
 #define I2C_FASTMODE 1 // Disable only when troubleshooting.
+#include "alsconfig.h"
+#if FEATURE_I2C_TIMEOUT
+#define I2C_TIMEOUT 10 // ms. A stuck bus (e.g. a disconnected sensor, the pull-ups are on its module) is then reported as an error instead of waiting forever.
+#endif
 #include <SoftI2CMaster.h>
 
 namespace BH1750
@@ -69,17 +73,25 @@ namespace BH1750
         constexpr byte _addressWrite = (_address << 1);
         // constexpr uint16_t maxRawValue = -1;
 
-        // Reads value directly from sensor. This is NOT in lux, and needs to be converted.
-        uint16_t readRawValue()
+        // Reads value directly from sensor. This is NOT in lux, and needs to be converted. Returns -1 if the sensor did not respond.
+        int32_t readRawValue()
         {
             byte buff[2];
 
-            i2c_start(_addressRead);
+            if (!i2c_start(_addressRead))
+            {
+                i2c_stop();
+                return -1;
+            }
             buff[0] = i2c_read(false);
             buff[1] = i2c_read(true);
             i2c_stop();
+#if FEATURE_I2C_TIMEOUT
+            if (!(_SFR_IO8(SCL_IN) & (1 << SCL_PIN))) // A read that timed out returns a partial byte, but SCL stays stuck low.
+                return -1;
+#endif
 
-            return ((buff[0] << 8) | buff[1]);
+            return (uint16_t(buff[0]) << 8) | buff[1];
         }
 
         // Sends byte directly to the sensor. Internal funciton.
@@ -123,6 +135,13 @@ namespace BH1750
         }
     }
 
+    // Provides the longest time one measurement takes in this configuration, in ms (in compile time). The datasheet gives
+    // 180 ms for the high resolution modes and 24 ms for the low resolution mode at the default MTREG, it scales with MTREG.
+    constexpr unsigned long measurementTime()
+    {
+        return ((_mode & 0b11) == 0b11 ? 24ul : 180ul) * _mtreg / BH1750_MTREG_DEFAULT + 1; // +1 rounds up
+    }
+
     // Provides the resolution in lux achieved using this configuration (in compile time).
     constexpr lux_t resolution()
     {
@@ -157,10 +176,11 @@ namespace BH1750
         return powerDown();
     }
 
-    // Main function of the library. Call this to retrieve lux values from the sensor.
+    // Main function of the library. Call this to retrieve lux values from the sensor. Returns a negative value if the sensor did not respond.
     lux_t readLux()
     {
-        return calcLux(readRawValue());
+        int32_t raw = readRawValue();
+        return raw < 0 ? -1 : calcLux(raw);
     }
 
 }
